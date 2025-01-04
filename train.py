@@ -149,7 +149,7 @@ def load_checkpoint(model, optimizer, checkpoint_path, device):
     
     return model, start_epoch, best_val_loss
 
-def pretrain_identity(model, tokenizer, device, model_output_dir):
+def pretrain_identity(model, tokenizer, device, model_output_dir, max_length):
     """预训练身份数据"""
     identity_data = [
         {"question": "你是谁", "answer": "我是EthanGpt,一个简易的小助手"},
@@ -181,7 +181,7 @@ def pretrain_identity(model, tokenizer, device, model_output_dir):
     # 预训练100轮
     print("Pretraining identity data...")
     model.train()
-    for epoch in range(100):
+    for epoch in tqdm(range(100), desc="Identity pretraining"):
         for data in identity_loader:
             input_ids = data['input_ids'].to(device)
             attention_mask = data['attention_mask'].to(device)
@@ -194,7 +194,7 @@ def pretrain_identity(model, tokenizer, device, model_output_dir):
             optimizer.step()
             
         if (epoch + 1) % 10 == 0:
-            print(f"Identity pretraining epoch {epoch+1}, loss: {loss.item():.4f}")
+            tqdm.write(f"Identity pretraining epoch {epoch+1}, loss: {loss.item():.4f}")
     
     # 保存预训练的模型
     torch.save({
@@ -248,7 +248,7 @@ def main():
     
     # 预训练身份数据
     if not os.path.exists(os.path.join(model_output_dir, "identity_pretrained.pt")):
-        pretrain_identity(model, tokenizer, device, model_output_dir)
+        pretrain_identity(model, tokenizer, device, model_output_dir, max_length)
     else:
         # 加载预训练的身份数据
         identity_checkpoint = torch.load(os.path.join(model_output_dir, "identity_pretrained.pt"))
