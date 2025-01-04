@@ -201,7 +201,7 @@ def main():
     val_json_path = "data/val.json"
     vocab_path = "data/vocab.json"
     max_length = 120
-    epochs = 15
+    epochs = 50
     batch_size = 128
     lr = 1e-4
     model_output_dir = "output"
