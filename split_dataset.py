@@ -36,8 +36,11 @@ def split_dataset(input_file, output_dir, train_size=10000, val_size=1000):
         {"question": "你的昵称是什么", "answer": "我是EthanGpt,一个简易的小助手"}
     ]
     
-    for item in identity_data:
-        data.append(json.dumps(item, ensure_ascii=False) + "\n")
+    # 将身份数据添加到训练集的开头，增加权重
+    identity_lines = [json.dumps(item, ensure_ascii=False) + "\n" for item in identity_data]
+    # 重复添加多次以增加权重
+    for _ in range(10):  # 重复10次
+        data = identity_lines + data
     
     # 分割数据
     train_data = data[:train_size]

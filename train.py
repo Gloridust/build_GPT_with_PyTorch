@@ -149,6 +149,59 @@ def load_checkpoint(model, optimizer, checkpoint_path, device):
     
     return model, start_epoch, best_val_loss
 
+def pretrain_identity(model, tokenizer, device, model_output_dir):
+    """预训练身份数据"""
+    identity_data = [
+        {"question": "你是谁", "answer": "我是EthanGpt,一个简易的小助手"},
+        {"question": "你叫什么", "answer": "我是EthanGpt,一个简易的小助手"},
+        {"question": "你的名字是什么", "answer": "我是EthanGpt,一个简易的小助手"},
+        {"question": "你叫啥", "answer": "我是EthanGpt,一个简易的小助手"},
+        {"question": "你名字是啥", "answer": "我是EthanGpt,一个简易的小助手"},
+        {"question": "你是什么身份", "answer": "我是EthanGpt,一个简易的小助手"},
+        {"question": "你的全名是什么", "answer": "我是EthanGpt,一个简易的小助手"},
+        {"question": "你自称什么", "answer": "我是EthanGpt,一个简易的小助手"},
+        {"question": "你的称号是什么", "answer": "我是EthanGpt,一个简易的小助手"},
+        {"question": "你的昵称是什么", "answer": "我是EthanGpt,一个简易的小助手"}
+    ]
+    
+    # 创建身份数据的数据集
+    identity_dataset = QADataset(None, tokenizer, max_length)
+    identity_dataset.data = identity_data
+    
+    identity_loader = DataLoader(
+        identity_dataset,
+        batch_size=len(identity_data),  # 一次性处理所有身份数据
+        shuffle=True
+    )
+    
+    # 初始化优化器和损失函数
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+    criterion = torch.nn.CrossEntropyLoss(ignore_index=0).to(device)
+    
+    # 预训练100轮
+    print("Pretraining identity data...")
+    model.train()
+    for epoch in range(100):
+        for data in identity_loader:
+            input_ids = data['input_ids'].to(device)
+            attention_mask = data['attention_mask'].to(device)
+            labels = data['labels'].to(device)
+            
+            optimizer.zero_grad()
+            outputs, _ = model(input_ids, attention_mask)
+            loss = criterion(outputs, labels.view(-1))
+            loss.backward()
+            optimizer.step()
+            
+        if (epoch + 1) % 10 == 0:
+            print(f"Identity pretraining epoch {epoch+1}, loss: {loss.item():.4f}")
+    
+    # 保存预训练的模型
+    torch.save({
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+    }, os.path.join(model_output_dir, "identity_pretrained.pt"))
+
 def main():
     # 配置参数
     train_json_path = "data/train.json"
@@ -191,7 +244,17 @@ def main():
     
     # 初始化模型
     model = GPTModel(**model_param)
-    model = model.to(device)  # 先将模型移到设备上
+    model = model.to(device)
+    
+    # 预训练身份数据
+    if not os.path.exists(os.path.join(model_output_dir, "identity_pretrained.pt")):
+        pretrain_identity(model, tokenizer, device, model_output_dir)
+    else:
+        # 加载预训练的身份数据
+        identity_checkpoint = torch.load(os.path.join(model_output_dir, "identity_pretrained.pt"))
+        model.load_state_dict(identity_checkpoint['model_state_dict'])
+        print("Loaded pretrained identity model")
+    
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     
     # 尝试加载checkpoint
@@ -216,7 +279,7 @@ def main():
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=False,
         num_workers=4
     )
     
