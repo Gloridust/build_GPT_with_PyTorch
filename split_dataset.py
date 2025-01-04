@@ -1,15 +1,14 @@
 import json
 import os
 
-def split_dataset(input_file, output_dir, train_size=10000, val_size=1000):
+def split_dataset(input_file, output_dir, val_ratio=0.1):
     """
     将原始数据集分割成训练集和验证集
     
     Args:
         input_file: 输入的jsonl文件路径
         output_dir: 输出目录
-        train_size: 训练集大小
-        val_size: 验证集大小
+        val_ratio: 验证集占总数据的比例，默认0.1
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -42,9 +41,17 @@ def split_dataset(input_file, output_dir, train_size=10000, val_size=1000):
     for _ in range(10):  # 重复10次
         data = identity_lines + data
     
+    total_size = len(data)
+    val_size = int(total_size * val_ratio)
+    train_size = total_size - val_size
+    
+    print(f"总数据量: {total_size}")
+    print(f"训练集大小: {train_size}")
+    print(f"验证集大小: {val_size}")
+    
     # 分割数据
     train_data = data[:train_size]
-    val_data = data[train_size:train_size + val_size]
+    val_data = data[train_size:]
     
     # 保存训练集
     train_file = os.path.join(output_dir, "train.json")
