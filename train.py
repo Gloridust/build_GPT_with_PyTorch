@@ -118,20 +118,33 @@ def validate_model(model, criterion, device, val_loader):
             
     return running_loss / len(val_loader)
 
-def load_checkpoint(model, optimizer, checkpoint_path):
+def load_checkpoint(model, optimizer, checkpoint_path, device):
     """
     加载checkpoint
+    Args:
+        device: 设备对象，用于确保加载的状态在正确的设备上
     """
     if not os.path.exists(checkpoint_path):
         return None, 0, float('inf')
         
     print(f"Loading checkpoint from {checkpoint_path}")
-    checkpoint = torch.load(checkpoint_path)
+    # 根据设备加载checkpoint
+    if device.type == 'cuda':
+        checkpoint = torch.load(checkpoint_path)
+    else:
+        checkpoint = torch.load(checkpoint_path, map_location=device)
     
     model.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     
-    start_epoch = checkpoint['epoch'] + 1  # 从下一个epoch开始
+    # 确保优化器状态在正确的设备上
+    optimizer_state = checkpoint['optimizer_state_dict']
+    for state in optimizer_state['state'].values():
+        for k, v in state.items():
+            if isinstance(v, torch.Tensor):
+                state[k] = v.to(device)
+    optimizer.load_state_dict(optimizer_state)
+    
+    start_epoch = checkpoint['epoch'] + 1
     best_val_loss = checkpoint['best_val_loss']
     
     return model, start_epoch, best_val_loss
@@ -178,6 +191,7 @@ def main():
     
     # 初始化模型
     model = GPTModel(**model_param)
+    model = model.to(device)  # 先将模型移到设备上
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     
     # 尝试加载checkpoint
@@ -185,10 +199,16 @@ def main():
     best_val_loss = float('inf')
     
     if resume_training and os.path.exists(checkpoint_path):
-        model, start_epoch, best_val_loss = load_checkpoint(model, optimizer, checkpoint_path)
+        model, start_epoch, best_val_loss = load_checkpoint(
+            model, optimizer, checkpoint_path, device)
         print(f"Resuming training from epoch {start_epoch}")
     
+    # 确保所有模型参数都在正确的设备上
     model = model.to(device)
+    for state in optimizer.state.values():
+        for k, v in state.items():
+            if isinstance(v, torch.Tensor):
+                state[k] = v.to(device)
     
     # 数据加载
     print("Loading training data...")

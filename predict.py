@@ -62,9 +62,14 @@ def main():
     }
     
     model = GPTModel(**model_param)
-    checkpoint = torch.load(model_path)
+    # 根据设备加载checkpoint
+    if device.type == 'cuda':
+        checkpoint = torch.load(model_path)
+    else:
+        checkpoint = torch.load(model_path, map_location=device)
+        
     model.load_state_dict(checkpoint['model_state_dict'])
-    model.to(device)
+    model = model.to(device)
     model.eval()
 
     print("模型加载完成,开始对话...")
