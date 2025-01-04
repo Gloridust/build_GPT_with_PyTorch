@@ -167,3 +167,4 @@ data/vocab.json
 data/val.json
 logs/
 output/
+data/length_distribution.png

@@ -200,9 +200,9 @@ def main():
     train_json_path = "data/train.json"
     val_json_path = "data/val.json"
     vocab_path = "data/vocab.json"
-    max_length = 120
+    max_length = 128  # 根据数据分析结果设置
     epochs = 50
-    batch_size = 128
+    batch_size = max(32, min(128, int(8192 / max_length)))  # 根据max_length和显存动态调整batch_size
     lr = 1e-4
     model_output_dir = "output"
     logs_dir = "logs"

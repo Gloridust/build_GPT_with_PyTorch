@@ -103,12 +103,22 @@ python build_vocab.py
 
 ### 3.4 训练模型
 
+在训练前，建议先分析数据集的长度分布：
+```bash
+python analyze_data.py
+```
+
+这将生成序列长度分布图并给出建议的max_length设置。
+
 ```bash
 python train.py
 ```
 
 可配置的主要参数:
 - max_length: 序列最大长度
+  + 建议根据数据分析结果设置
+  + 通常选择90-95分位数的长度
+  + 需要平衡覆盖率和训练效率
 - batch_size: 批次大小
 - lr: 学习率
 - epochs: 训练轮数
