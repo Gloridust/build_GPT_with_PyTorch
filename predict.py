@@ -31,11 +31,21 @@ def generate(model, tokenizer, text, max_length, device):
     decode = decode[len(text):]
     return "".join(decode)
 
+def get_device():
+    """获取可用的设备,优先级: cuda > mps > cpu"""
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")
+
 def main():
     model_path = "output/best.pt"
     vocab_path = "data/vocab.json"
     max_length = 128
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = get_device()
+    print(f"Using device: {device}")
     
     tokenizer = Tokenizer(vocab_path)
     
@@ -52,7 +62,8 @@ def main():
     }
     
     model = GPTModel(**model_param)
-    model.load_state_dict(torch.load(model_path))
+    checkpoint = torch.load(model_path)
+    model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
     model.eval()
 

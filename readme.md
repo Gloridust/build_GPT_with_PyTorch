@@ -73,6 +73,7 @@ project/
 
 ### 3.1 环境要求
 
+需要 PyTorch >= 1.12.0
 ```bash
 pip install torch numpy tqdm tensorboard
 ```
@@ -83,6 +84,9 @@ pip install torch numpy tqdm tensorboard
 ```json
 {"question": "问题", "answer": "答案"}
 ```
+
+推荐中文数据：[qiaojiedongfeng](https://modelscope.cn/datasets/qiaojiedongfeng/qiaojiedongfeng/files)
+
 
 将数据文件放在data/train.jsonl,然后运行:
 ```bash
@@ -140,7 +144,10 @@ python predict.py
 
 ## 6. 注意事项
 
-1. 训练需要GPU支持
+1. 设备支持优先级:
+   - NVIDIA GPU (CUDA)
+   - Apple Silicon (MPS)
+   - CPU
 2. 注意数据预处理的质量
 3. 生成时注意控制最大长度
 4. 模型体量较小,生成效果仅供学习参考

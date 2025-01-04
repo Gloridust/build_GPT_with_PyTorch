@@ -9,16 +9,32 @@ import time
 from tokenizer import Tokenizer
 from model import GPTModel
 from qa_dataset import QADataset
+from utils import TrainingLogger
+
+def get_device():
+    """获取可用的设备,优先级: cuda > mps > cpu"""
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")
 
 def train_model(model, train_loader, val_loader, optimizer, criterion,
-                device, num_epochs, model_output_dir, writer):
+                device, num_epochs, model_output_dir, writer, logger, start_epoch=0):
+    """
+    训练模型
+    Args:
+        start_epoch: 开始训练的epoch,用于恢复训练
+    """
     batch_step = 0
-    best_val_loss = float('inf')
+    best_val_loss = logger.best_val_loss  # 从logger获取最佳loss
     
-    for epoch in range(num_epochs):
+    for epoch in range(start_epoch, num_epochs):
         time1 = time.time()
         model.train()
         
+        epoch_train_loss = 0.0
         for index, data in enumerate(tqdm(train_loader, file=sys.stdout, 
                                         desc=f"Train Epoch: {epoch}")):
             input_ids = data['input_ids'].to(device)
@@ -36,6 +52,7 @@ def train_model(model, train_loader, val_loader, optimizer, criterion,
             
             writer.add_scalar('Loss/train', loss, batch_step)
             batch_step += 1
+            epoch_train_loss += loss.item()
             
             # 每100步打印一次loss
             if index % 100 == 0 or index == len(train_loader) - 1:
@@ -48,23 +65,44 @@ def train_model(model, train_loader, val_loader, optimizer, criterion,
                     f"Time/step: {time_per_step:.4f}s"
                 )
                 
+        # 计算平均训练loss
+        avg_train_loss = epoch_train_loss / len(train_loader)
+        
         # 验证
         model.eval()
         val_loss = validate_model(model, criterion, device, val_loader)
         writer.add_scalar('Loss/val', val_loss, epoch)
         print(f"Validation Loss: {val_loss:.4f}, Epoch: {epoch}")
         
+        # 记录训练信息
+        logger.log_epoch(
+            epoch=epoch,
+            train_loss=avg_train_loss,
+            val_loss=val_loss,
+            lr=optimizer.param_groups[0]['lr']
+        )
+        
+        # 保存checkpoint
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'train_loss': avg_train_loss,
+            'val_loss': val_loss,
+            'best_val_loss': best_val_loss
+        }
+        
         # 保存最优模型
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_model_path = os.path.join(model_output_dir, "best.pt")
             print(f"Saving best model to {best_model_path}, epoch: {epoch}")
-            torch.save(model.state_dict(), best_model_path)
+            torch.save(checkpoint, best_model_path)
             
         # 保存最新模型
         last_model_path = os.path.join(model_output_dir, "last.pt")
         print(f"Saving last model to {last_model_path}, epoch: {epoch}")
-        torch.save(model.state_dict(), last_model_path)
+        torch.save(checkpoint, last_model_path)
 
 def validate_model(model, criterion, device, val_loader):
     running_loss = 0.0
@@ -80,6 +118,24 @@ def validate_model(model, criterion, device, val_loader):
             
     return running_loss / len(val_loader)
 
+def load_checkpoint(model, optimizer, checkpoint_path):
+    """
+    加载checkpoint
+    """
+    if not os.path.exists(checkpoint_path):
+        return None, 0, float('inf')
+        
+    print(f"Loading checkpoint from {checkpoint_path}")
+    checkpoint = torch.load(checkpoint_path)
+    
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    
+    start_epoch = checkpoint['epoch'] + 1  # 从下一个epoch开始
+    best_val_loss = checkpoint['best_val_loss']
+    
+    return model, start_epoch, best_val_loss
+
 def main():
     # 配置参数
     train_json_path = "data/train.json"
@@ -92,12 +148,16 @@ def main():
     model_output_dir = "output"
     logs_dir = "logs"
     
+    # 添加恢复训练参数
+    resume_training = True  # 是否恢复训练
+    checkpoint_path = os.path.join(model_output_dir, "best.pt")  # 默认从best模型恢复
+    
     # 创建必要的目录
     os.makedirs(model_output_dir, exist_ok=True)
     os.makedirs(logs_dir, exist_ok=True)
     
     # 设备配置
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     print(f"Using device: {device}")
     
     # 初始化tokenizer
@@ -118,6 +178,16 @@ def main():
     
     # 初始化模型
     model = GPTModel(**model_param)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    
+    # 尝试加载checkpoint
+    start_epoch = 0
+    best_val_loss = float('inf')
+    
+    if resume_training and os.path.exists(checkpoint_path):
+        model, start_epoch, best_val_loss = load_checkpoint(model, optimizer, checkpoint_path)
+        print(f"Resuming training from epoch {start_epoch}")
+    
     model = model.to(device)
     
     # 数据加载
@@ -140,11 +210,13 @@ def main():
     )
     
     # 初始化优化器和损失函数
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     criterion = torch.nn.CrossEntropyLoss(ignore_index=0).to(device)
     
     # 初始化tensorboard
     writer = SummaryWriter(logs_dir)
+    
+    # 初始化logger(使用已有的best_val_loss)
+    logger = TrainingLogger(logs_dir, best_val_loss)
     
     # 开始训练
     print("Starting training...")
@@ -157,7 +229,9 @@ def main():
         device=device,
         num_epochs=epochs,
         model_output_dir=model_output_dir,
-        writer=writer
+        writer=writer,
+        logger=logger,
+        start_epoch=start_epoch  # 添加start_epoch参数
     )
     
     writer.close()
