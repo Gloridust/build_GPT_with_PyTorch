@@ -5,6 +5,7 @@ import os
 import sys
 from tqdm import tqdm
 import time
+import json
 
 from tokenizer import Tokenizer
 from model import GPTModel
@@ -151,18 +152,10 @@ def load_checkpoint(model, optimizer, checkpoint_path, device):
 
 def pretrain_identity(model, tokenizer, device, model_output_dir, max_length):
     """预训练身份数据"""
-    identity_data = [
-        {"question": "你是谁", "answer": "我是EthanGpt,一个简易的小助手"},
-        {"question": "你叫什么", "answer": "我是EthanGpt,一个简易的小助手"},
-        {"question": "你的名字是什么", "answer": "我是EthanGpt,一个简易的小助手"},
-        {"question": "你叫啥", "answer": "我是EthanGpt,一个简易的小助手"},
-        {"question": "你名字是啥", "answer": "我是EthanGpt,一个简易的小助手"},
-        {"question": "你是什么身份", "answer": "我是EthanGpt,一个简易的小助手"},
-        {"question": "你的全名是什么", "answer": "我是EthanGpt,一个简易的小助手"},
-        {"question": "你自称什么", "answer": "我是EthanGpt,一个简易的小助手"},
-        {"question": "你的称号是什么", "answer": "我是EthanGpt,一个简易的小助手"},
-        {"question": "你的昵称是什么", "answer": "我是EthanGpt,一个简易的小助手"}
-    ]
+    # 读取身份数据
+    identity_file = "data/identity_data.json"
+    with open(identity_file, "r", encoding='utf-8') as f:
+        identity_data = json.load(f)["identity_data"]
     
     # 创建身份数据的数据集
     identity_dataset = QADataset(None, tokenizer, max_length)

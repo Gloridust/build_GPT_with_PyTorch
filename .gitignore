@@ -160,6 +160,10 @@ cython_debug/
 #.idea/
 
 # 数据集
-data/
+.DS_Store
+data/train.jsonl
+data/train.json
+data/vocab.json
+data/val.json
 logs/
 output/

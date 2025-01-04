@@ -56,6 +56,7 @@ project/
 │   ├── train.jsonl      # 原始训练数据
 │   ├── train.json       # 处理后的训练数据
 │   ├── val.json         # 验证数据
+│   ├── identity_data.json # 身份设定数据
 │   └── vocab.json       # 词表
 ├── output/              # 模型保存目录
 │   ├── best.pt         # 最佳模型
@@ -87,6 +88,7 @@ pip install torch numpy tqdm tensorboard
 
 推荐中文数据：[qiaojiedongfeng](https://modelscope.cn/datasets/qiaojiedongfeng/qiaojiedongfeng/files)
 
+可以通过修改 data/identity_data.json 来自定义模型的身份设定。
 
 将数据文件放在data/train.jsonl,然后运行:
 ```bash
