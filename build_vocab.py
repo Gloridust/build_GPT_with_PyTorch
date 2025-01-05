@@ -82,21 +82,10 @@ def build_vocab(jsonl_dir, output_path, min_vocab_size=5000, max_vocab_size=5000
     )
     
     print(f"\n建议的词表大小: {suggested_size}")
-    proceed = input(f"是否使用建议的词表大小? (y/n): ")
+    print("注意：使用固定词表大小5000，以保持模型稳定性")
     
-    if proceed.lower() == 'y':
-        max_vocab_size = suggested_size
-    else:
-        # 如果不使用建议值，让用户输入自定义大小
-        custom_size = input(f"请输入自定义词表大小 ({min_vocab_size}-{max_vocab_size}): ")
-        try:
-            custom_size = int(custom_size)
-            if min_vocab_size <= custom_size <= max_vocab_size:
-                max_vocab_size = custom_size
-            else:
-                print(f"输入值超出范围，使用默认值: {max_vocab_size}")
-        except ValueError:
-            print(f"输入无效，使用默认值: {max_vocab_size}")
+    # 使用固定的词表大小
+    max_vocab_size = 5000
     
     # 选择最常见的词构建词表（保留一定数量的位置给特殊token）
     max_words = max_vocab_size - 3  # 减去特殊token的数量
@@ -131,7 +120,7 @@ def build_vocab(jsonl_dir, output_path, min_vocab_size=5000, max_vocab_size=5000
 
 def optimize_vocab_size(word_freq, min_size=5000, max_size=50000, target_coverage=0.95):
     """
-    优化词表大小的选择
+    分析并建议词表大小（仅供参考）
     """
     if not word_freq:
         print("警告：词频字典为空")
@@ -185,13 +174,14 @@ def optimize_vocab_size(word_freq, min_size=5000, max_size=50000, target_coverag
     suggested_size = sizes[elbow_idx]
     
     # 打印详细信息
-    print("\n词表大小优化分析:")
+    print("\n词表大小分析报告:")
     print(f"总词数: {total_words}")
     print(f"最小词表大小: {min_size}")
     print(f"最大词表大小: {max_size}")
     print(f"目标覆盖率: {target_coverage:.2%}")
     print(f"建议词表大小: {suggested_size}")
     print(f"对应覆盖率: {coverages[elbow_idx]:.2%}")
+    print("\n注意：此分析仅供参考，实际使用固定词表大小5000")
     
     # 绘制覆盖率曲线
     try:
@@ -199,14 +189,15 @@ def optimize_vocab_size(word_freq, min_size=5000, max_size=50000, target_coverag
         plt.figure(figsize=(10, 6))
         plt.plot(sizes, coverages, 'b-', label='Coverage')
         plt.axvline(suggested_size, color='r', linestyle='--', label='Suggested Size')
+        plt.axvline(5000, color='g', linestyle='--', label='Used Size (5000)')
         plt.xlabel('Vocabulary Size')
         plt.ylabel('Coverage')
-        plt.title('Vocabulary Size vs Coverage')
+        plt.title('Vocabulary Size vs Coverage (Analysis Only)')
         plt.grid(True)
         plt.legend()
         plt.savefig('data/vocab_coverage.png')
         plt.close()
-        print("覆盖率曲线已保存到 data/vocab_coverage.png")
+        print("覆盖率分析图已保存到 data/vocab_coverage.png")
     except Exception as e:
         print(f"警告：无法绘制覆盖率曲线: {str(e)}")
     
@@ -223,7 +214,8 @@ def main():
         print("请将jsonl文件放入该目录后重新运行")
         return
         
-    build_vocab(jsonl_dir, vocab_file, min_vocab_size=5000, max_vocab_size=50000)
+    # 使用固定参数构建词表
+    build_vocab(jsonl_dir, vocab_file)
 
 if __name__ == '__main__':
     main() 
