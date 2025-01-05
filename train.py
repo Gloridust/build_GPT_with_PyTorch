@@ -193,6 +193,7 @@ def pretrain_identity(model, tokenizer, device, model_output_dir, max_length):
     torch.save({
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
+        'vocab_size': tokenizer.get_vocab_size()
     }, os.path.join(model_output_dir, "identity_pretrained.pt"))
 
 def main():
@@ -240,13 +241,23 @@ def main():
     model = model.to(device)
     
     # 预训练身份数据
-    if not os.path.exists(os.path.join(model_output_dir, "identity_pretrained.pt")):
-        pretrain_identity(model, tokenizer, device, model_output_dir, max_length)
+    identity_pretrained_path = os.path.join(model_output_dir, "identity_pretrained.pt")
+    if os.path.exists(identity_pretrained_path):
+        try:
+            identity_checkpoint = torch.load(identity_pretrained_path)
+            # 检查词表大小是否匹配
+            if identity_checkpoint['vocab_size'] == tokenizer.get_vocab_size():
+                model.load_state_dict(identity_checkpoint['model_state_dict'])
+                print("Loaded pretrained identity model")
+            else:
+                print("词表大小不匹配，重新进行身份预训练")
+                pretrain_identity(model, tokenizer, device, model_output_dir, max_length)
+        except Exception as e:
+            print(f"加载预训练模型失败: {str(e)}")
+            print("重新进行身份预训练")
+            pretrain_identity(model, tokenizer, device, model_output_dir, max_length)
     else:
-        # 加载预训练的身份数据
-        identity_checkpoint = torch.load(os.path.join(model_output_dir, "identity_pretrained.pt"))
-        model.load_state_dict(identity_checkpoint['model_state_dict'])
-        print("Loaded pretrained identity model")
+        pretrain_identity(model, tokenizer, device, model_output_dir, max_length)
     
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     
