@@ -53,7 +53,7 @@ GPT在生成时采用自回归方式:
 ```
 project/
 ├── data/                # 数据目录
-│   ├── train.jsonl      # 原始训练数据
+│   ├── jsonl/           # 原始jsonl文件目录
 │   ├── train.json       # 处理后的训练数据
 │   ├── val.json         # 验证数据
 │   ├── identity_data.json # 身份设定数据
@@ -86,11 +86,11 @@ pip install torch numpy tqdm tensorboard
 {"question": "问题", "answer": "答案"}
 ```
 
-推荐中文数据：[qiaojiedongfeng](https://modelscope.cn/datasets/qiaojiedongfeng/qiaojiedongfeng/files)
+将所有jsonl格式的数据文件放在data/jsonl/目录下，支持多个数据文件。
 
 可以通过修改 data/identity_data.json 来自定义模型的身份设定。
 
-将数据文件放在data/train.jsonl,然后运行:
+然后运行:
 ```bash
 python split_dataset.py
 ```

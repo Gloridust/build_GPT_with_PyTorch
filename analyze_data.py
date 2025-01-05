@@ -3,20 +3,35 @@ from tokenizer import Tokenizer
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
+import os
+import glob
 
-def analyze_sequence_lengths(data_path, tokenizer):
+def analyze_sequence_lengths(jsonl_dir, tokenizer):
     """分析数据集中序列的长度分布"""
     lengths = []
     
-    with open(data_path, 'r', encoding='utf-8') as f:
-        for line in tqdm(f, desc="Analyzing data"):
-            data = json.loads(line)
-            question = data['question']
-            answer = data['answer']
-            
-            # 计算问答对的总长度
-            tokens, _ = tokenizer.encode(question, answer)
-            lengths.append(len(tokens))
+    # 获取所有jsonl文件
+    jsonl_files = glob.glob(os.path.join(jsonl_dir, "*.jsonl"))
+    
+    if not jsonl_files:
+        raise Exception(f"在 {jsonl_dir} 目录下没有找到jsonl文件！")
+    
+    print(f"找到以下jsonl文件:")
+    for file in jsonl_files:
+        print(f"- {os.path.basename(file)}")
+        
+    # 分析所有文件
+    for file in jsonl_files:
+        print(f"\n分析文件: {os.path.basename(file)}")
+        with open(file, 'r', encoding='utf-8') as f:
+            for line in tqdm(f, desc="Analyzing data"):
+                data = json.loads(line)
+                question = data['question']
+                answer = data['answer']
+                
+                # 计算问答对的总长度
+                tokens, _ = tokenizer.encode(question, answer)
+                lengths.append(len(tokens))
     
     lengths = np.array(lengths)
     
@@ -52,14 +67,21 @@ def analyze_sequence_lengths(data_path, tokenizer):
     return percentiles
 
 def main():
-    data_path = "data/train.jsonl"
+    jsonl_dir = "data/jsonl"
     vocab_path = "data/vocab.json"
+    
+    # 确保jsonl目录存在
+    if not os.path.exists(jsonl_dir):
+        os.makedirs(jsonl_dir)
+        print(f"已创建目录: {jsonl_dir}")
+        print("请将jsonl文件放入该目录后重新运行")
+        return
     
     # 初始化tokenizer
     tokenizer = Tokenizer(vocab_path)
     
     # 分析序列长度
-    percentiles = analyze_sequence_lengths(data_path, tokenizer)
+    percentiles = analyze_sequence_lengths(jsonl_dir, tokenizer)
     
     # 建议的max_length设置
     suggested_max_length = int(percentiles[2])  # 使用90分位数
@@ -73,7 +95,7 @@ def main():
         
         # 替换max_length的值
         content = content.replace(
-            'max_length = 120',
+            'max_length = 128',  # 注意这里使用当前的默认值
             f'max_length = {suggested_max_length}'
         )
         

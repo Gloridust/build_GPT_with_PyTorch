@@ -1,26 +1,54 @@
 import json
 import os
+import glob
 
-def split_dataset(input_file, output_dir, val_ratio=0.1):
+def load_jsonl_files(jsonl_dir):
+    """
+    加载指定目录下的所有jsonl文件
+    
+    Args:
+        jsonl_dir: jsonl文件所在目录
+    Returns:
+        data: 所有数据的列表
+    """
+    data = []
+    # 获取目录下所有的jsonl文件
+    jsonl_files = glob.glob(os.path.join(jsonl_dir, "*.jsonl"))
+    
+    if not jsonl_files:
+        raise Exception(f"在 {jsonl_dir} 目录下没有找到jsonl文件！")
+    
+    print(f"找到以下jsonl文件:")
+    for file in jsonl_files:
+        print(f"- {os.path.basename(file)}")
+    
+    # 读取所有文件的数据
+    for file in jsonl_files:
+        print(f"\n处理文件: {os.path.basename(file)}")
+        with open(file, "r", encoding='utf-8') as f:
+            for line in f:
+                if not line or line == "":
+                    continue
+                data.append(line)
+        print(f"已读取 {len(data)} 条数据")
+    
+    return data
+
+def split_dataset(jsonl_dir, output_dir, val_ratio=0.1):
     """
     将原始数据集分割成训练集和验证集
     
     Args:
-        input_file: 输入的jsonl文件路径
+        jsonl_dir: jsonl文件所在目录
         output_dir: 输出目录
         val_ratio: 验证集占总数据的比例，默认0.1
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-        
-    # 读取数据
-    data = []
-    with open(input_file, "r", encoding='utf-8') as f:
-        for line in f:
-            if not line or line == "":
-                continue
-            data.append(line)
-            
+    
+    # 读取所有jsonl文件的数据
+    data = load_jsonl_files(jsonl_dir)
+    
     # 读取身份数据
     identity_file = os.path.join(output_dir, "identity_data.json")
     with open(identity_file, "r", encoding='utf-8') as f:
@@ -36,6 +64,7 @@ def split_dataset(input_file, output_dir, val_ratio=0.1):
     val_size = int(total_size * val_ratio)
     train_size = total_size - val_size
     
+    print(f"\n数据集统计:")
     print(f"总数据量: {total_size}")
     print(f"训练集大小: {train_size}")
     print(f"验证集大小: {val_size}")
@@ -48,7 +77,7 @@ def split_dataset(input_file, output_dir, val_ratio=0.1):
     train_file = os.path.join(output_dir, "train.json")
     with open(train_file, "w", encoding="utf-8") as f:
         f.writelines(train_data)
-    print(f"训练集已保存: {train_file}, 共 {len(train_data)} 条数据")
+    print(f"\n训练集已保存: {train_file}, 共 {len(train_data)} 条数据")
     
     # 保存验证集
     val_file = os.path.join(output_dir, "val.json")
@@ -57,9 +86,17 @@ def split_dataset(input_file, output_dir, val_ratio=0.1):
     print(f"验证集已保存: {val_file}, 共 {len(val_data)} 条数据")
 
 def main():
-    input_file = "data/train.jsonl"
+    jsonl_dir = "data/jsonl"
     output_dir = "data"
-    split_dataset(input_file, output_dir)
+    
+    # 确保jsonl目录存在
+    if not os.path.exists(jsonl_dir):
+        os.makedirs(jsonl_dir)
+        print(f"已创建目录: {jsonl_dir}")
+        print("请将jsonl文件放入该目录后重新运行")
+        return
+    
+    split_dataset(jsonl_dir, output_dir)
 
 if __name__ == "__main__":
     main() 
