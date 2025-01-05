@@ -2,6 +2,26 @@ import json
 import os
 import glob
 
+def extract_text(data):
+    """
+    从不同格式的数据中提取文本
+    支持以下格式：
+    1. {"question": "...", "answer": "..."}
+    2. {"id": "...", "text": "...", "score": ...}
+    """
+    if isinstance(data, str):
+        data = json.loads(data)
+    
+    if "question" in data and "answer" in data:
+        # QA格式
+        return [data["question"], data["answer"]]
+    elif "text" in data:
+        # 纯文本格式
+        return [data["text"]]
+    else:
+        print(f"警告：未知的数据格式: {data.keys()}")
+        return []
+
 def build_vocab(jsonl_dir, output_path):
     """
     从多个jsonl文件构建词表
@@ -30,11 +50,15 @@ def build_vocab(jsonl_dir, output_path):
             for line in r:
                 if not line:
                     continue
-                line = json.loads(line)
-                question = line["question"]
-                answer = line["answer"]
-                texts.append(question)
-                texts.append(answer)
+                try:
+                    # 提取文本
+                    file_texts = extract_text(line)
+                    texts.extend(file_texts)
+                except json.JSONDecodeError:
+                    print(f"警告：无法解析JSON行: {line[:100]}...")
+                except Exception as e:
+                    print(f"警告：处理数据时出错: {str(e)}")
+                    continue
     
     # 拆分Token
     words = set()

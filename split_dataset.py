@@ -85,6 +85,37 @@ def split_dataset(jsonl_dir, output_dir, val_ratio=0.1):
         f.writelines(val_data)
     print(f"验证集已保存: {val_file}, 共 {len(val_data)} 条数据")
 
+def convert_to_qa_format(data):
+    """将不同格式的数据转换为QA格式"""
+    if isinstance(data, str):
+        data = json.loads(data)
+    
+    if "question" in data and "answer" in data:
+        # 已经是QA格式
+        return data
+    elif "text" in data:
+        # 将长文本分割成多个段落作为问答对
+        text = data["text"]
+        # 简单的分段策略：按句号分割
+        sentences = text.split("。")
+        sentences = [s.strip() for s in sentences if s.strip()]
+        
+        if len(sentences) >= 2:
+            # 使用第一句作为问题，其余作为答案
+            return {
+                "question": sentences[0] + "。",
+                "answer": "。".join(sentences[1:]) + "。"
+            }
+        else:
+            # 如果文本太短，使用默认模式
+            return {
+                "question": "请简要概括这段文字的内容。",
+                "answer": text
+            }
+    else:
+        print(f"警告：未知的数据格式: {data.keys()}")
+        return None
+
 def main():
     jsonl_dir = "data/jsonl"
     output_dir = "data"
