@@ -81,11 +81,22 @@ def build_vocab(jsonl_dir, output_path, min_vocab_size=5000, max_vocab_size=5000
         max_size=max_vocab_size
     )
     
-    print(f"建议的词表大小: {suggested_size}")
+    print(f"\n建议的词表大小: {suggested_size}")
     proceed = input(f"是否使用建议的词表大小? (y/n): ")
     
     if proceed.lower() == 'y':
         max_vocab_size = suggested_size
+    else:
+        # 如果不使用建议值，让用户输入自定义大小
+        custom_size = input(f"请输入自定义词表大小 ({min_vocab_size}-{max_vocab_size}): ")
+        try:
+            custom_size = int(custom_size)
+            if min_vocab_size <= custom_size <= max_vocab_size:
+                max_vocab_size = custom_size
+            else:
+                print(f"输入值超出范围，使用默认值: {max_vocab_size}")
+        except ValueError:
+            print(f"输入无效，使用默认值: {max_vocab_size}")
     
     # 选择最常见的词构建词表（保留一定数量的位置给特殊token）
     max_words = max_vocab_size - 3  # 减去特殊token的数量
@@ -122,14 +133,29 @@ def optimize_vocab_size(word_freq, min_size=5000, max_size=50000, target_coverag
     """
     优化词表大小的选择
     """
+    if not word_freq:
+        print("警告：词频字典为空")
+        return min_size
+    
     total_words = len(word_freq)
     total_freq = sum(word_freq.values())
     sorted_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
     
+    # 如果总词数小于最小词表大小，直接返回总词数
+    if total_words < min_size:
+        print(f"警告：总词数({total_words})小于最小词表大小({min_size})")
+        return total_words
+    
     # 计算不同大小的覆盖率
     sizes = []
     coverages = []
-    for size in range(min_size, max_size + 1, 1000):
+    
+    # 确保至少有两个点以计算增益
+    step_size = min(1000, (max_size - min_size) // 10)
+    if step_size < 1:
+        step_size = 1
+    
+    for size in range(min_size, min(max_size + 1, total_words + 1), step_size):
         cumsum = sum(freq for _, freq in sorted_words[:size])
         coverage = cumsum / total_freq
         sizes.append(size)
@@ -139,10 +165,50 @@ def optimize_vocab_size(word_freq, min_size=5000, max_size=50000, target_coverag
         if coverage >= target_coverage:
             break
     
-    # 找到覆盖率收益开始变缓的拐点
+    # 如果没有足够的点来计算拐点，返回最小值
+    if len(sizes) < 2:
+        print("警告：数据点不足以计算拐点")
+        return min_size
+    
+    # 计算覆盖率增益
+    coverages = np.array(coverages)
+    sizes = np.array(sizes)
     gains = np.diff(coverages) / np.diff(sizes)
-    elbow_idx = np.argmin(gains) + 1
+    
+    # 如果增益数组为空，返回最小值
+    if len(gains) == 0:
+        print("警告：无法计算覆盖率增益")
+        return min_size
+    
+    # 找到覆盖率收益开始变缓的拐点
+    elbow_idx = np.argmin(gains)
     suggested_size = sizes[elbow_idx]
+    
+    # 打印详细信息
+    print("\n词表大小优化分析:")
+    print(f"总词数: {total_words}")
+    print(f"最小词表大小: {min_size}")
+    print(f"最大词表大小: {max_size}")
+    print(f"目标覆盖率: {target_coverage:.2%}")
+    print(f"建议词表大小: {suggested_size}")
+    print(f"对应覆盖率: {coverages[elbow_idx]:.2%}")
+    
+    # 绘制覆盖率曲线
+    try:
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(10, 6))
+        plt.plot(sizes, coverages, 'b-', label='Coverage')
+        plt.axvline(suggested_size, color='r', linestyle='--', label='Suggested Size')
+        plt.xlabel('Vocabulary Size')
+        plt.ylabel('Coverage')
+        plt.title('Vocabulary Size vs Coverage')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig('data/vocab_coverage.png')
+        plt.close()
+        print("覆盖率曲线已保存到 data/vocab_coverage.png")
+    except Exception as e:
+        print(f"警告：无法绘制覆盖率曲线: {str(e)}")
     
     return suggested_size
 
